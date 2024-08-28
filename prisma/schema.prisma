@@ -20,6 +20,7 @@ model Measure {
   customer_code    String
   measure_datetime DateTime
   measure_type     String
+  measure_value    Int      @default(0)
   is_confirmed     Boolean  @default(false)
   created_at       DateTime @default(now())
   updated_at       DateTime @updatedAt
