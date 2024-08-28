@@ -1,4 +1,12 @@
-import { Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { MeasureService } from './measure.service';
 
 @Controller('measure')
@@ -17,8 +25,18 @@ export class MeasureController {
   }
 
   @Post('upload')
-  async insertMeasure(): Promise<string> {
-    return await this.measureService.insert();
+  async insertMeasure(
+    @Body('image') image: string,
+    @Body('customer_code') customerCode: string,
+    @Body('measure_datetime') measureDatetime: Date,
+    @Body('measure_type') measureType: string,
+  ): Promise<any> {
+    return await this.measureService.insert(
+      image,
+      customerCode,
+      measureDatetime,
+      measureType,
+    );
   }
 
   @Patch('confirm')
