@@ -15,10 +15,10 @@ datasource db {
 
 model Measure {
   id               Int      @id @default(autoincrement())
-  uuid             String   @default(uuid())
+  uuid             String   @unique @default(uuid())
   image            Bytes?
   customer_code    String
-  measure_datetime DateTime
+  measure_datetime DateTime @default(now())
   measure_type     String
   measure_value    Int      @default(0)
   is_confirmed     Boolean  @default(false)
