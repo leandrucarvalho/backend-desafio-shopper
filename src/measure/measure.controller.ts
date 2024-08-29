@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Param,
   Patch,
   Post,
@@ -17,7 +18,7 @@ export class MeasureController {
   async listMeasure(
     @Query('measure_type') measureType: string,
     @Param('customer_code') customerCode: string,
-  ): Promise<string> {
+  ): Promise<any> {
     return await this.measureService.listByCustomCode(
       measureType,
       customerCode,
@@ -25,6 +26,7 @@ export class MeasureController {
   }
 
   @Post('upload')
+  @HttpCode(200)
   async insertMeasure(
     @Body('image') image: string,
     @Body('customer_code') customerCode: string,
@@ -40,7 +42,13 @@ export class MeasureController {
   }
 
   @Patch('confirm')
-  async confirmMeasure(): Promise<string> {
-    return await this.measureService.confirm();
+  async confirmMeasure(
+    @Body('measure_uuid') measureUuid: string,
+    @Body('confirmd_value') confirmedValue: number,
+  ): Promise<string> {
+    return await this.measureService.confirmMeasure(
+      measureUuid,
+      confirmedValue,
+    );
   }
 }
