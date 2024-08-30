@@ -9,7 +9,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { MeasureService } from './measure.service';
-
+import { ApiTags } from '@nestjs/swagger';
+@ApiTags('Measure')
 @Controller('measure')
 export class MeasureController {
   constructor(private readonly measureService: MeasureService) {}
