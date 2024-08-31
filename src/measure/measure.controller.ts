@@ -10,6 +10,8 @@ import {
 } from '@nestjs/common';
 import { MeasureService } from './measure.service';
 import { ApiTags } from '@nestjs/swagger';
+import { MeasureRequestDto } from './dto/measure-request.dto';
+import { MeasureConfirmRequestDto } from './dto/measure-confirm-request.dto';
 @ApiTags('Measure')
 @Controller('measure')
 export class MeasureController {
@@ -28,28 +30,14 @@ export class MeasureController {
 
   @Post('upload')
   @HttpCode(200)
-  async insertMeasure(
-    @Body('image') image: string,
-    @Body('customer_code') customerCode: string,
-    @Body('measure_datetime') measureDatetime: Date,
-    @Body('measure_type') measureType: string,
-  ): Promise<any> {
-    return await this.measureService.insert(
-      image,
-      customerCode,
-      measureDatetime,
-      measureType,
-    );
+  async insertMeasure(@Body() body: MeasureRequestDto): Promise<any> {
+    return await this.measureService.insert(body);
   }
 
   @Patch('confirm')
   async confirmMeasure(
-    @Body('measure_uuid') measureUuid: string,
-    @Body('confirmd_value') confirmedValue: number,
+    @Body() bodyRequest: MeasureConfirmRequestDto,
   ): Promise<string> {
-    return await this.measureService.confirmMeasure(
-      measureUuid,
-      confirmedValue,
-    );
+    return await this.measureService.confirmMeasure(bodyRequest);
   }
 }

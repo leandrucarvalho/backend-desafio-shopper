@@ -16,11 +16,11 @@ datasource db {
 model Measure {
   id               Int      @id @default(autoincrement())
   uuid             String   @unique @default(uuid())
-  image            Bytes?
+  image            String?
   customer_code    String
-  measure_datetime DateTime @default(now())
+  measure_datetime String
   measure_type     String
-  measure_value    Int      @default(0)
+  measure_value    String?
   is_confirmed     Boolean  @default(false)
   created_at       DateTime @default(now())
   updated_at       DateTime @updatedAt

@@ -4,43 +4,42 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { validateOrReject } from 'class-validator';
 import { PrismaService } from 'src/config/prisma/prisma.service';
-import { isUUID } from 'class-validator';
+
+import { GeminiService } from 'src/gemini/gemini.service';
+import { MeasureRequestDto } from './dto/measure-request.dto';
+import { MeasureConfirmRequestDto } from './dto/measure-confirm-request.dto';
+import { MeasureListQueryParams } from './dto/measure-list-query-params.dto';
+import { MeasureListPathParams } from './dto/measure-list-path-params.dto';
+import { isEmpty } from 'lodash';
+import { GeminiResponseDto } from 'src/gemini/dto/gemini-response-dto';
 
 @Injectable()
 export class MeasureService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly _geminiService: GeminiService,
+  ) {}
 
-  async insert(
-    image: string,
-    customerCode: string,
-    measureDatetime: Date,
-    measureType: string,
-  ): Promise<any> {
-    const date = new Date(measureDatetime);
+  async insert(body: MeasureRequestDto): Promise<any> {
+    const _validatedBody = new MeasureRequestDto(body);
+    await validateOrReject(_validatedBody);
 
-    if (isNaN(date.getTime())) {
-      throw new BadRequestException({
-        error_code: 'INVALID_DATA',
-        error_description: 'A data fornecida não é válida.',
+    // fazer o analizes pra pegar o ref_mes.
+    const resultAnalyzes: GeminiResponseDto =
+      await this._geminiService.analyzeImage({
+        data: body.image.data,
+        mime: body.image.mime,
       });
-    }
 
-    if (!this.isValidBase64(image)) {
-      throw new BadRequestException({
-        error_code: 'INVALID_DATA',
-        error_description: 'A imagem não está em formato Base64 válido.',
-      });
-    }
+    console.log('### ResultImageAnalyze', resultAnalyzes);
 
     const existingMeasure = await this.prisma.measure.findFirst({
       where: {
-        customer_code: customerCode,
-        measure_type: measureType,
-        measure_datetime: {
-          gte: new Date(date.getFullYear(), date.getMonth(), 1),
-          lt: new Date(date.getFullYear(), date.getMonth() + 1, 1),
-        },
+        customer_code: resultAnalyzes.customer_code,
+        measure_type: body.measure_type,
+        measure_datetime: resultAnalyzes.ref_mes,
       },
     });
 
@@ -51,56 +50,29 @@ export class MeasureService {
       });
     }
 
-    // 3. Integrar com a API LLM (Google Gemini)
-    const measureValue = await this.getMeasureFromImage(/* image */);
-
-    // 4. Persistir a leitura no banco de dados
     const newMeasure = await this.prisma.measure.create({
       data: {
-        customer_code: customerCode,
-        measure_type: measureType,
-        measure_datetime: date,
-        measure_value: measureValue,
-        // image: 'url-da-imagem', // Substitua pela URL real da imagem gerada pelo serviço de armazenamento
+        customer_code: resultAnalyzes.customer_code,
+        measure_type: body.measure_type,
+        measure_datetime: resultAnalyzes.ref_mes,
+        measure_value: resultAnalyzes.consumo_faturado,
+        image: resultAnalyzes.imageUri,
       },
     });
 
-    // 5. Retornar a resposta com os dados
     return {
       image_url: newMeasure.image,
       measure_value: newMeasure.measure_value,
-      measure_uuid: newMeasure.id, // Supondo que o ID seja o UUID
+      measure_uuid: newMeasure.uuid,
     };
   }
 
-  private async getMeasureFromImage(/* image: string */): Promise<number> {
-    // Chamar a API do Google Gemini e processar a resposta
-    // Aqui está um exemplo simulado:
-    return 1234; // Substitua com a lógica real para integrar com a LLM
-  }
-
-  private isValidBase64(str: string): boolean {
-    // Validação simples de Base64
-    try {
-      return btoa(atob(str)) === str;
-    } catch (err) {
-      return err;
-    }
-  }
-
-  async confirmMeasure(
-    measureUuid: string,
-    confirmedValue: number,
-  ): Promise<any> {
-    if (!isUUID(measureUuid) || typeof confirmedValue !== 'number') {
-      throw new BadRequestException({
-        error_code: 'INVALID_DATA',
-        error_description: 'UUID ou valor confirmado inválido.',
-      });
-    }
+  async confirmMeasure(bodyRequest: MeasureConfirmRequestDto): Promise<any> {
+    const _validatedBody = new MeasureConfirmRequestDto(bodyRequest);
+    await validateOrReject(_validatedBody);
 
     const existingMeasure = await this.prisma.measure.findUnique({
-      where: { uuid: measureUuid },
+      where: { uuid: _validatedBody.measureUuid },
     });
 
     if (!existingMeasure) {
@@ -118,9 +90,9 @@ export class MeasureService {
     }
 
     await this.prisma.measure.update({
-      where: { uuid: measureUuid },
+      where: { uuid: _validatedBody.measureUuid },
       data: {
-        measure_value: confirmedValue,
+        measure_value: _validatedBody.confirmedValue,
         is_confirmed: true,
       },
     });
@@ -132,12 +104,18 @@ export class MeasureService {
     measureType: string,
     customerCode: string,
   ): Promise<any> {
-    if (measureType && !['WATER', 'GAS'].includes(measureType.toUpperCase())) {
+    const _validateQueryParams = new MeasureListQueryParams(measureType);
+    try {
+      await validateOrReject(_validateQueryParams);
+    } catch (_error: any) {
       throw new BadRequestException({
         error_code: 'INVALID_TYPE',
-        error_description: 'Tipo de medição não permitida',
+        error_description: _error[0].constraints.isEnum,
       });
     }
+
+    const _validatePathParams = new MeasureListPathParams(customerCode);
+    await validateOrReject(_validatePathParams);
 
     const filters: any = {
       customer_code: customerCode,
@@ -151,7 +129,7 @@ export class MeasureService {
       where: filters,
     });
 
-    if (!allMeasures || allMeasures.length === 0) {
+    if (isEmpty(allMeasures)) {
       throw new NotFoundException({
         error_code: 'MEASURES_NOT_FOUND',
         error_description: 'Nenhuma leitura encontrada',
